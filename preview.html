@@ -1,0 +1,127 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0 auto;max-width:1000px;padding:16px;color:var(--hatch-widget-text);background:var(--hatch-widget-bg)}
+h1{font-size:26px;margin:8px 0} h2{font-size:20px;margin-top:28px;border-bottom:2px solid #c1440e;padding-bottom:4px}
+.banner{background:var(--hatch-widget-surface-muted);border:1px solid var(--hatch-widget-accent);padding:10px 14px;border-radius:8px;font-size:14px}
+#map{height:420px;border-radius:10px;border:1px solid var(--hatch-widget-border)}
+table{border-collapse:collapse;width:100%;font-size:14px} th,td{border:1px solid var(--hatch-widget-border);padding:6px 8px;text-align:left}
+th{background:var(--hatch-widget-surface-muted)} tr:nth-child(even){background:var(--hatch-widget-surface-muted)}
+select{font-size:15px;padding:6px;margin:4px 8px 4px 0}
+.verdict{font-weight:700;font-size:17px;margin:10px 0}
+.card{border:1px solid var(--hatch-widget-border);border-radius:8px;padding:12px;margin:8px 0}
+.note{color:var(--hatch-widget-muted);font-size:13px}
+</style>
+<div class="banner"><b>PREVIEW</b> — a static look at the backup Streamlit app, built from the same
+<code>sites.csv</code>. The map tiles are live; the dropdowns below work. The real app runs with
+<code>streamlit run app.py</code> and is identical in content.</div>
+<h1>Martian Map — Interplanetary Survival Guide</h1>
+<p>Where could humans survive on Mars? Five real landing-site candidates, ranked by a Survival Score
+built from their own NASA/ESA data. The most famous site, Jezero Crater, is NOT the best place to survive.</p>
+<p style="color:var(--hatch-widget-accent)">✅ Score check passed — all 5 scores match the v2 formula.</p>
+
+<h2>1. Map — real Mars, not Earth</h2>
+<div id="map"></div>
+<p class="note">Backgrounds: Viking MDIM2.1 Colorized Mosaic (NASA/Viking/USGS) and OPM Mars Basemap v0.1
+(OpenPlanetaryMap). Switch with the layer button top-right of the map.</p>
+
+<h2>Ranking — best Survival Score first</h2>
+<table><tr><th>Site</th><th>Score</th><th>Resources</th><th>Temp/Rad</th><th>Terrain</th><th>Hazards</th><th>Pressure</th><th>Air</th></tr>
+<tr><td><b>Oxia Planum</b></td><td><b>78</b></td><td>4</td><td>4</td><td>4</td><td>4</td><td>3</td><td>4</td></tr><tr><td><b>Utopia Planitia</b></td><td><b>78</b></td><td>5</td><td>3</td><td>4</td><td>3</td><td>5</td><td>3</td></tr><tr><td><b>Elysium Planitia</b></td><td><b>70</b></td><td>2</td><td>4</td><td>5</td><td>4</td><td>3</td><td>3</td></tr><tr><td><b>Gale Crater</b></td><td><b>68</b></td><td>3</td><td>4</td><td>3</td><td>3</td><td>5</td><td>3</td></tr><tr><td><b>Jezero Crater</b></td><td><b>62</b></td><td>3</td><td>4</td><td>2</td><td>3</td><td>3</td><td>4</td></tr></table>
+<p class="note">Top of the list is a tie at 78 — Oxia Planum and Utopia Planitia. Oxia wins on balance,
+Utopia wins on water alone (resource 5).</p>
+
+<h2>2. Compare two sites</h2>
+<select id="selA"><option value="Jezero Crater">Jezero Crater</option><option value="Gale Crater">Gale Crater</option><option value="Elysium Planitia">Elysium Planitia</option><option value="Oxia Planum">Oxia Planum</option><option value="Utopia Planitia">Utopia Planitia</option></select><select id="selB"><option value="Jezero Crater">Jezero Crater</option><option value="Gale Crater">Gale Crater</option><option value="Elysium Planitia">Elysium Planitia</option><option value="Oxia Planum">Oxia Planum</option><option value="Utopia Planitia">Utopia Planitia</option></select>
+<div id="compare"></div>
+
+<h2>3. Survival Guide — if you landed here, you'd need…</h2>
+<select id="selG"><option value="Jezero Crater">Jezero Crater</option><option value="Gale Crater">Gale Crater</option><option value="Elysium Planitia">Elysium Planitia</option><option value="Oxia Planum">Oxia Planum</option><option value="Utopia Planitia">Utopia Planitia</option></select>
+<div id="guide"></div>
+
+<hr><p class="note">Formula (v2): score = (resources×0.25 + temp/radiation×0.20 + terrain×0.20
++ hazards×0.15 + pressure×0.10 + air×0.10) × 20. Every site fact comes from its source link in
+sites.csv (NASA/JPL, ESA, USGS). Built by Satyam as a backup to the main app.</p>
+
+<script>
+const SITES = [{"name": "Jezero Crater", "latitude": 18.4446, "longitude": 77.4509, "mission": "Perseverance rover (NASA, landed 18 Feb 2021)", "terrain": "Crater floor with ancient river delta, rocky outcrops", "temperature_notes": "Near-equatorial (18 deg N); large day-night swings typical of Mars", "water_ice": "Ancient lake and river delta ~3.5 billion years ago; clays and carbonates, but no confirmed easily accessible ice deposit at the site", "hazards": "Rocks and delta cliffs; dust; crater terrain is rougher than a plain", "description": "A 45 km crater that once held a lake. One of the best places to look for signs of ancient life, but not the easiest place to land or live.", "source_url": "https://www.jpl.nasa.gov/news/press_kits/ingenuity/landing/mission/jezero_crater/", "water_score": 3, "terrain_score": 2, "temperature_score": 4, "hazard_safety_score": 3, "sunlight_score": 4, "survival_score": 62, "elevation_m": -2640, "resource_score": 3, "temp_radiation_score": 4, "pressure_score": 3, "air_score": 4}, {"name": "Gale Crater", "latitude": -4.5895, "longitude": 137.4417, "mission": "Curiosity rover (NASA, landed 6 Aug 2012) - Bradbury Landing", "terrain": "Flat plain (Aeolis Palus) inside a large crater, with 5.5 km Mount Sharp nearby", "temperature_notes": "Near the equator (about 5 deg S), so relatively mild for Mars and good sunlight", "water_ice": "Probable ancient crater lake; lower layers of Mount Sharp contain minerals that indicate a wet history. Water is in minerals, not an ice deposit", "hazards": "Dust; sharp rocks that damaged Curiosity's wheels; steep terrain if heading toward Mount Sharp", "description": "A 154 km crater with a mountain of layered rock in the middle - like a history book of Mars' watery past. Flat landing area, rough exploring further out.", "source_url": "https://science.nasa.gov/resource/gale-crater-future-home-of-mars-rover-curiosity/", "water_score": 3, "terrain_score": 3, "temperature_score": 4, "hazard_safety_score": 3, "sunlight_score": 5, "survival_score": 68, "elevation_m": -4501, "resource_score": 3, "temp_radiation_score": 4, "pressure_score": 5, "air_score": 3}, {"name": "Elysium Planitia", "latitude": 4.5024, "longitude": 135.6234, "mission": "InSight lander (NASA, landed 26 Nov 2018)", "terrain": "Very flat, smooth lava plain - chosen specially for landing safety", "temperature_notes": "Near the equator (4.5 deg N). InSight site temperature range during its mission: about -100 C to -20 C", "water_ice": "Little surface water evidence; chosen to study Mars' interior (marsquakes and heat flow), not water", "hazards": "Dust build-up on solar panels (this ended the InSight mission); otherwise very few rocks", "description": "The flattest, safest car park on Mars. Boring on the surface, perfect for landing - but you would have to bring or find your water elsewhere.", "source_url": "https://www.jpl.nasa.gov/news/press_kits/insight/landing/facts/", "water_score": 2, "terrain_score": 5, "temperature_score": 5, "hazard_safety_score": 4, "sunlight_score": 5, "survival_score": 70, "elevation_m": -2613, "resource_score": 2, "temp_radiation_score": 4, "pressure_score": 3, "air_score": 3}, {"name": "Oxia Planum", "latitude": 18.2, "longitude": -24.55, "mission": "ExoMars Rosalind Franklin rover (ESA, planned)", "terrain": "Wide, low, relatively smooth clay-rich plain", "temperature_notes": "Near-equatorial (18 deg N), similar latitude to Jezero", "water_ice": "Extensive clay (phyllosilicate) rocks formed with ancient water; evidence of groundwater activity. Clays are a sign water was here for a long time", "hazards": "Wind-shaped ridges and ripples (transverse aeolian ridges) can slow travel; dust", "description": "A flat clay plain where water once sat for a long time - its clays may preserve signs of past life, and its flatness makes it attractive for a base.", "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11583114/", "water_score": 4, "terrain_score": 4, "temperature_score": 4, "hazard_safety_score": 4, "sunlight_score": 4, "survival_score": 78, "elevation_m": -2000, "resource_score": 4, "temp_radiation_score": 4, "pressure_score": 3, "air_score": 4}, {"name": "Utopia Planitia", "latitude": 46.7, "longitude": 117.5, "mission": "Viking 2 lander (NASA, 1976) and Zhurong rover (China, 2021) - coords are the region centre", "terrain": "Huge flat northern plain, some rocky and scalloped ice-rich ground", "temperature_notes": "High latitude (about 47 deg N), so much colder and less sunlight than equatorial sites", "water_ice": "NASA found a large buried ice deposit here - about as much water as Lake Superior - buried under 1-10 m of soil", "hazards": "Extreme cold; ice-rich ground can be uneven (scalloped permafrost); rocks in places", "description": "Mars' biggest plain, with a hidden ocean of ice under the soil. Fantastic for water, hard on warmth and solar power.", "source_url": "https://en.wikipedia.org/wiki/Utopia_Planitia", "water_score": 5, "terrain_score": 4, "temperature_score": 2, "hazard_safety_score": 3, "sunlight_score": 2, "survival_score": 78, "elevation_m": -4495, "resource_score": 5, "temp_radiation_score": 3, "pressure_score": 5, "air_score": 3}];
+const byName = Object.fromEntries(SITES.map(s => [s.name, s]));
+const FACTORS = [["Resources","resource_score"],["Temp / Radiation","temp_radiation_score"],
+["Terrain","terrain_score"],["Hazards","hazard_safety_score"],["Pressure","pressure_score"],
+["Air profile","air_score"]];
+
+// --- map (same tiles as map_view.py) ---
+const map = L.map("map", {center:[0,0], zoom:2});
+const viking = L.tileLayer("http://s3-eu-west-1.amazonaws.com/whereonmars.cartodb.net/viking_mdim21_global/{z}/{x}/{y}.png",
+  {tms:true, maxZoom:7, attribution:"NASA/Viking/USGS (via OpenPlanetaryMap)"});
+const opm = L.tileLayer("https://cartocdn-gusc.global.ssl.fastly.net/opmbuilder/api/v1/map/named/opm-mars-basemap-v0-1/0,1,2,3,4/{z}/{x}/{y}.png",
+  {maxZoom:7, attribution:"OpenPlanetaryMap"});
+viking.addTo(map);
+L.control.layers({"Mars — Viking imagery": viking, "Mars — OPM basemap (no labels)": opm}).addTo(map);
+SITES.forEach(s => {
+  const col = s.survival_score >= 75 ? "green" : s.survival_score >= 65 ? "orange" : "red";
+  L.circleMarker([s.latitude, s.longitude], {color: col, fillColor: col, fillOpacity: 0.8, radius: 8})
+    .bindPopup("<b>"+s.name+"</b><br>Survival Score: "+s.survival_score+"/100<br>Mission: "+s.mission)
+    .bindTooltip(s.name+" — "+s.survival_score+"/100").addTo(map);
+});
+
+// --- compare ---
+function renderCompare(){
+  const a = byName[document.getElementById("selA").value];
+  const b = byName[document.getElementById("selB").value];
+  if (a.name === b.name) { document.getElementById("compare").innerHTML = "<p>Pick two different sites.</p>"; return; }
+  let rows = FACTORS.map(([label, k]) => "<tr><td>"+label+"</td><td>"+a[k]+"</td><td>"+b[k]+"</td></tr>").join("");
+  rows += "<tr><td><b>SURVIVAL SCORE</b></td><td><b>"+a.survival_score+"</b></td><td><b>"+b.survival_score+"</b></td></tr>";
+  const verdict = a.survival_score > b.survival_score ? "🏆 "+a.name+" ("+a.survival_score+") beats "+b.name+" ("+b.survival_score+")."
+    : b.survival_score > a.survival_score ? "🏆 "+b.name+" ("+b.survival_score+") beats "+a.name+" ("+a.survival_score+")."
+    : "It's a tie — both score "+a.survival_score+".";
+  document.getElementById("compare").innerHTML =
+    "<table><tr><th>Factor (1–5)</th><th>"+a.name+"</th><th>"+b.name+"</th></tr>"+rows+"</table>"
+    + '<p class="verdict">'+verdict+'</p>'
+    + '<div class="card"><h3>'+a.name+'</h3><p>'+a.description+'</p><p><b>Water:</b> '+a.water_ice+'</p><p class="note">Source: '+a.source_url+'</p></div>'
+    + '<div class="card"><h3>'+b.name+'</h3><p>'+b.description+'</p><p><b>Water:</b> '+b.water_ice+'</p><p class="note">Source: '+b.source_url+'</p></div>';
+}
+
+// --- guide ---
+function line(score, low, mid, high){ return score <= 2 ? low : score === 3 ? mid : high; }
+function renderGuide(){
+  const g = byName[document.getElementById("selG").value];
+  const L1 = line(g.resource_score,
+    "Bring water or extract it — little easy water here. Its row says: "+g.water_ice,
+    "Mixed resources — plan how you'd get water. Its row says: "+g.water_ice,
+    "Resources are this site's strength. Its row says: "+g.water_ice);
+  const L2 = line(g.terrain_score,
+    "Landing and driving need extra care. Its row says: "+g.terrain,
+    "Mixed terrain — flat in places, rough in others. Its row says: "+g.terrain,
+    "Terrain helps landing and travel here.");
+  const L3 = line(g.temp_radiation_score,
+    "Heating, insulation and radiation shelter are critical here. Its row says: "+g.temperature_notes,
+    "Mixed temperatures — plan for cold spells and shelter. Its row says: "+g.temperature_notes,
+    "Temperature and radiation are among this site's better factors — still plan for day-night swings and shelter.");
+  const L4 = line(g.hazard_safety_score,
+    "Extra care and shelter needed. Its row says: "+g.hazards,
+    "Mixed hazards — plan around them. Its row says: "+g.hazards,
+    "Fewer hazards than most sites here.");
+  const L5 = "This site sits at "+g.elevation_m.toLocaleString()+" m elevation — lower ground means thicker air, easier landings and a little more shielding from radiation. " + line(g.pressure_score,
+    "High ground here — thin air, harder landings, less shielding.",
+    "Middling pressure — neither the thickest nor the thinnest air.",
+    "Low ground here — thicker air helps landings and shielding.");
+  const L6 = line(g.air_score,
+    "Dust and wind are a real problem here — plan to protect panels and suits.",
+    "Mixed dust and wind — expect dusty spells.",
+    "Dust and wind are manageable here.");
+  document.getElementById("guide").innerHTML =
+    "<h3>"+g.name+" — Survival Score "+g.survival_score+"/100</h3><ul>"
+    + ["<b>Resources:</b> "+L1,"<b>Terrain:</b> "+L2,"<b>Temperature / Radiation:</b> "+L3,
+       "<b>Hazards:</b> "+L4,"<b>Pressure:</b> "+L5,"<b>Air profile:</b> "+L6]
+      .map(x => "<li>"+x+"</li>").join("")+"</ul>";
+}
+
+document.getElementById("selA").value = "Oxia Planum";
+document.getElementById("selB").value = "Jezero Crater";
+document.getElementById("selG").value = "Utopia Planitia";
+document.getElementById("selA").addEventListener("change", renderCompare);
+document.getElementById("selB").addEventListener("change", renderCompare);
+document.getElementById("selG").addEventListener("change", renderGuide);
+renderCompare(); renderGuide();
+</script>
